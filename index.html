@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galaxy Battle - Guerra Espacial</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #030713;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+header {
+  padding: 15px;
+  background: #09152d;
+  border-bottom: 2px solid #00d9ff;
+}
+
+h1 {
+  margin: 5px;
+  color: #00e5ff;
+}
+
+#estadisticas {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+}
+
+.stat {
+  background: #132344;
+  padding: 10px 15px;
+  border-radius: 10px;
+  min-width: 95px;
+}
+
+.stat span {
+  color: #00e5ff;
+  font-weight: bold;
+}
+
+canvas {
+  display: block;
+  width: min(94vw, 400px);
+  height: auto;
+  margin: auto;
+  background: #02040d;
+  border: 2px solid #173d70;
+  border-radius: 10px;
+  touch-action: none;
+}
+
+button {
+  border: 1px solid #2373a5;
+  border-radius: 10px;
+  background: #132c50;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:active {
+  background: #087eac;
+}
+
+#controles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 400px;
+  margin: 12px auto;
+  padding: 0 5px;
+}
+
+#controles button {
+  min-height: 52px;
+}
+
+#disparar {
+  background: #007da8;
+}
+
+#pausa {
+  margin-bottom: 15px;
+}
+
+#mensaje {
+  color: #00e5ff;
+  padding: 8px;
+  min-height: 35px;
+}
+
+#pantalla {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 12, 0.92);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 10;
+}
+
+#caja {
+  background: #0b1935;
+  border: 2px solid #00d9ff;
+  border-radius: 18px;
+  padding: 25px;
+  width: min(100%, 340px);
+}
+
+#accion {
+  width: 100%;
+  margin-top: 15px;
+  background: #007fa8;
+}
+
+.instrucciones {
+  color: #bdcfea;
+  font-size: 13px;
+  padding: 10px;
+  line-height: 1.6;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🚀 GALAXY BATTLE</h1>
+  <div>GUERRA DE NAVES ESPACIALES</div>
+</header>
+
+<div id="estadisticas">
+  <div class="stat">Puntos<br><span id="puntos">0</span></div>
+  <div class="stat">Vidas<br><span id="vidas">❤️❤️❤️</span></div>
+  <div class="stat">Nivel<br><span id="nivel">1</span></div>
+</div>
+
+<canvas id="juego" width="360" height="480"></canvas>
+
+<div id="mensaje">¡Defiende la galaxia!</div>
+
+<div id="controles">
+  <button id="izquierda">◀️ IZQUIERDA</button>
+  <button id="disparar">⚡ DISPARAR</button>
+  <button id="derecha">DERECHA ▶️</button>
+</div>
+
+<button id="pausa">⏸️ PAUSAR</button>
+
+<div class="instrucciones">
+  Mueve tu nave y dispara contra los enemigos.<br>
+  Cada enemigo destruido vale 10 puntos.<br>
+  Cada 100 puntos avanzas de nivel.<br>
+  En computadora: flechas para moverte y espacio para disparar.
+</div>
+
+<div id="pantalla">
+  <div id="caja">
+    <div style="font-size:50px">🛸</div>
+    <h2 id="titulo">GUERRA ESPACIAL</h2>
+    <p id="descripcion">¡La galaxia está bajo ataque! Piloto, necesitamos tu ayuda.</p>
+    <button id="accion">▶️ COMENZAR MISIÓN</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("juego");
+const ctx = canvas.getContext("2d");
+
+const pantalla = document.getElementById("pantalla");
+const titulo = document.getElementById("titulo");
+const descripcion = document.getElementById("descripcion");
+const accion = document.getElementById("accion");
+
+const puntosHTML = document.getElementById("puntos");
+const vidasHTML = document.getElementById("vidas");
+const nivelHTML = document.getElementById("nivel");
+const mensaje = document.getElementById("mensaje");
+
+const W = canvas.width;
+const H = canvas.height;
+
+let nave, balas, enemigos, balasEnemigas, estrellas, particulas;
+let puntos = 0;
+let vidas = 3;
+let nivel = 1;
+let jugando = false;
+let pausado = false;
+let terminado = false;
+let fotograma = 0;
+let tiempoEnemigo = 0;
+let tiempoDisparo = 0;
+let invulnerable = 0;
+let anterior = 0;
+let animacion = 0;
+
+const teclas = {
+  izquierda: false,
+  derecha: false,
+  disparar: false
+};
+
+function preparar() {
+  puntos = 0;
+  vidas = 3;
+  nivel = 1;
+  fotograma = 0;
+  tiempoEnemigo = 0;
+  tiempoDisparo = 0;
+  invulnerable = 0;
+
+  nave = {
+    x: W / 2,
+    y: H - 43,
+    velocidad: 225
+  };
+
+  balas = [];
+  enemigos = [];
+  balasEnemigas = [];
+  particulas = [];
+
+  estrellas = Array.from({ length: 75 }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    tamano: Math.random() * 2 + 0.5,
+    velocidad: 15 + Math.random() * 35
+  }));
+
+  teclas.izquierda = false;
+  teclas.derecha = false;
+  teclas.disparar = false;
+
+  actualizarDatos();
+}
+
+function actualizarDatos() {
+  puntosHTML.textContent = puntos;
+  vidasHTML.textContent =
+    "❤️".repeat(vidas) + "🖤".repeat(3 - vidas);
+  nivelHTML.textContent = nivel;
+}
+
+function dibujarNave(x, y, enemiga = false) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = enemiga ? "#ff3157" : "#12dcff";
+  ctx.shadowColor = ctx.fillStyle;
+  ctx.shadowBlur = 12;
+
+  ctx.beginPath();
+
+  if (enemiga) {
+    ctx.moveTo(-13, -8);
+    ctx.lineTo(-5, -3);
+    ctx.lineTo(0, 10);
+    ctx.lineTo(5, -3);
+    ctx.lineTo(13, -8);
+    ctx.lineTo(9, 7);
+    ctx.lineTo(0, 11);
+    ctx.lineTo(-9, 7);
+  } else {
+    ctx.moveTo(0, -17);
+    ctx.lineTo(12, 10);
+    ctx.lineTo(4, 7);
+    ctx.lineTo(0, 12);
+    ctx.lineTo(-4, 7);
+    ctx.lineTo(-12, 10);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+
+  if (!enemiga) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-3, -2, 6, 8);
+
+    ctx.fillStyle = "#ff9d32";
+    ctx.fillRect(-4, 10, 3, 7);
+    ctx.fillRect(2, 10, 3, 7);
+  }
+
+  ctx.restore();
+}
+
+function explosion(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const angulo = Math.random() * Math.PI * 2;
+    const velocidad = 30 + Math.random() * 100;
+
+    particulas.push({
+      x,
+      y,
+      vx: Math.cos(angulo) * velocidad,
+      vy: Math.sin(angulo) * velocidad,
+      vida: 0.4 + Math.random() * 0.3,
+      color
+    });
+  }
+}
+
+function crearEnemigo() {
+  enemigos.push({
+    x: 20 + Math.random() * (W - 40),
+    y: -20,
+    velocidad: 35 + nivel * 7 + Math.random() * 15,
+    fase: Math.random() * 6.28,
+    muerto: false
+  });
+}
+
+function disparar() {
+  balas.push({
+    x: nave.x,
+    y: nave.y - 15,
+    velocidad: 350,
+    muerta: false
+  });
+}
+
+function perderVida() {
+  if (invulnerable > 0 || terminado) return;
+
+  vidas--;
+  invulnerable = 1.2;
+
+  explosion(nave.x, nave.y, "#32eaff");
+  actualizarDatos();
+
+  if (vidas <= 0) {
+    terminarJuego();
+  }
+}
+
+function mostrarPantalla(t, d, b) {
+  titulo.textContent = t;
+  descripcion.textContent = d;
+  accion.textContent = b;
+  pantalla.style.display = "flex";
+}
+
+function comenzar() {
+  if (animacion) {
+    cancelAnimationFrame(animacion);
+  }
+
+  preparar();
+
+  jugando = true;
+  pausado = false;
+  terminado = false;
+
+  pantalla.style.display = "none";
+  mensaje.textContent = "¡Combate en curso!";
+
+  anterior = performance.now();
+  animacion = requestAnimationFrame(ciclo);
+}
+
+function terminarJuego() {
+  jugando = false;
+  terminado = true;
+
+  teclas.izquierda = false;
+  teclas.derecha = false;
+  teclas.disparar = false;
+
+  mensaje.textContent = "Misión finalizada.";
+
+  mostrarPantalla(
+    "💥 MISIÓN FALLIDA",
+    "Puntuación: " + puntos + " | Nivel: " + nivel,
+    "↻ NUEVA MISIÓN"
+  );
+}
+
+function pausarJuego() {
+  if (!jugando || terminado) return;
+
+  pausado = !pausado;
+
+  if (pausado) {
+    teclas.izquierda = false;
+    teclas.derecha = false;
+    teclas.disparar = false;
+
+    mostrarPantalla(
+      "⏸️ JUEGO PAUSADO",
+      "La batalla está detenida. ¿Listo para continuar?",
+      "▶️ CONTINUAR"
+    );
+
+    mensaje.textContent = "Juego pausado.";
+  } else {
+    pantalla.style.display = "none";
+    mensaje.textContent = "¡Continúa la batalla!";
+
+    anterior = performance.now();
+    animacion = requestAnimationFrame(ciclo);
+  }
+}
+
+function dibujar(dt) {
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = "#030713";
+  ctx.fillRect(0, 0, W, H);
+
+  // Estrellas
+  for (const estrella of estrellas) {
+    estrella.y += estrella.velocidad * dt;
+
+    if (estrella.y > H) {
+      estrella.y = 0;
+      estrella.x = Math.random() * W;
+    }
+
+    ctx.fillStyle = "#b8dfff";
+    ctx.globalAlpha = 0.4 + estrella.tamano / 3;
+    ctx.fillRect(
+      estrella.x,
+      estrella.y,
+      estrella.tamano,
+      estrella.tamano
+    );
+  }
+
+  ctx.globalAlpha = 1;
+
+  // Nave del jugador
+  if (invulnerable <= 0 || Math.floor(fotograma / 5) % 2 === 0) {
+    dibujarNave(nave.x, nave.y);
+  }
+
+  // Láseres del jugador
+  ctx.fillStyle = "#65f7ff";
+  ctx.shadowColor = "#65f7ff";
+  ctx.shadowBlur = 8;
+
+  for (const bala of balas) {
+    ctx.fillRect(bala.x - 2, bala.y - 8, 4, 12);
+  }
+
+  // Disparos enemigos
+  ctx.fillStyle = "#ff536b";
+  ctx.shadowColor = "#ff3157";
+
+  for (const bala of balasEnemigas) {
+    ctx.beginPath();
+    ctx.ellipse(bala.x, bala.y, 3, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.shadowBlur = 0;
+
+  // Enemigos
+  for (const enemigo of enemigos) {
+    if (!enemigo.muerto) {
+      dibujarNave(enemigo.x, enemigo.y, true);
+    }
+  }
+
+  // Explosiones
+  for (const p of particulas) {
+    ctx.globalAlpha = Math.max(0, p.vida / 0.7);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 3, 3);
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+function ciclo(tiempo) {
+  if (!jugando || pausado) return;
+
+  const dt = Math.min((tiempo - anterior) / 1000, 0.035);
+  anterior = tiempo;
+  fotograma++;
+
+  invulnerable = Math.max(0, invulnerable - dt);
+
+  // Movimiento
+  if (teclas.izquierda) {
+    nave.x -= nave.velocidad * dt;
+  }
+
+  if (teclas.derecha) {
+    nave.x += nave.velocidad * dt;
+  }
+
+  nave.x = Math.max(17, Math.min(W - 17, nave.x));
+
+  // Disparos automáticos mientras se mantiene el botón
+  tiempoDisparo -= dt;
+
+  if (teclas.disparar && tiempoDisparo <= 0) {
+    disparar();
+    tiempoDisparo = 0.18;
+  }
+
+  // Generación de enemigos
+  tiempoEnemigo -= dt;
+
+  if (tiempoEnemigo <= 0) {
+    crearEnemigo();
+    tiempoEnemigo = Math.max(0.3, 1 - nivel * 0.065);
+  }
+
+  // Movimiento de los láseres
+  for (const bala of balas) {
+    bala.y -= bala.velocidad * dt;
+  }
+
+  for (const bala of balasEnemigas) {
+    bala.y += bala.velocidad * dt;
+  }
+
+  // Movimiento y disparos enemigos
+  for (const enemigo of enemigos) {
+    enemigo.y += enemigo.velocidad * dt;
+    enemigo.x += Math.sin(fotograma * 0.03 + enemigo.fase) * 20 * dt;
+
+    if (Math.random() < dt * (0.25 + nivel * 0.06)) {
+      balasEnemigas.push({
+        x: enemigo.x,
+        y: enemigo.y + 10,
+        velocidad: 110 + nivel * 12,
+        muerta: false
+      });
+    }
+
+    if (
+      Math.hypot(enemigo.x - nave.x, enemigo.y - nave.y) < 22
+    ) {
+      enemigo.muerto = true;
+      perderVida();
+    }
+  }
+
+  // Colisiones entre láseres y enemigos
+  for (const bala of balas) {
+    for (const enemigo of enemigos) {
+      if (
+        !bala.muerta &&
+        !enemigo.muerto &&
+        Math.abs(bala.x - enemigo.x) < 16 &&
+        Math.abs(bala.y - enemigo.y) < 17
+      ) {
+        bala.muerta = true;
+        enemigo.muerto = true;
+        puntos += 10;
+
+        explosion(enemigo.x, enemigo.y, "#ff5473");
+        break;
+      }
+    }
+  }
+
+  // Colisiones con disparos enemigos
+  for (const bala of balasEnemigas) {
+    if (
+      !bala.muerta &&
+      Math.abs(bala.x - nave.x) < 13 &&
+      Math.abs(bala.y - nave.y) < 17
+    ) {
+      bala.muerta = true;
+      perderVida();
+    }
+  }
+
+  // Eliminar objetos fuera de la pantalla
+  for (const enemigo of enemigos) {
+    if (enemigo.y > H + 20) enemigo.muerto = true;
+  }
+
+  balas = balas.filter(b => !b.muerta && b.y > -15);
+
+  balasEnemigas = balasEnemigas.filter(
+    b => !b.muerta && b.y < H + 10
+  );
+
+  enemigos = enemigos.filter(e => !e.muerto);
+
+  for (const p of particulas) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vida -= dt;
+  }
+
+  particulas = particulas.filter(p => p.vida > 0);
+
+  nivel = Math.floor(puntos / 100) + 1;
+  actualizarDatos();
+  dibujar(dt);
+
+  if (jugando && !pausado) {
+    animacion = requestAnimationFrame(ciclo);
+  }
+}
+
+// Controles para teléfono y computadora
+function mantener(id, propiedad) {
+  const boton = document.getElementById(id);
+
+  boton.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    teclas[propiedad] = true;
+
+    try {
+      boton.setPointerCapture(e.pointerId);
+    } catch (_) {}
+  });
+
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev => {
+    boton.addEventListener(ev, () => {
+      teclas[propiedad] = false;
+    });
+  });
+}
+
+mantener("izquierda", "izquierda");
+mantener("derecha", "derecha");
+mantener("disparar", "disparar");
+
+accion.addEventListener("click", () => {
+  if (pausado && !terminado) {
+    pausado = false;
+    jugando = true;
+    pantalla.style.display = "none";
+    anterior = performance.now();
+    animacion = requestAnimationFrame(ciclo);
+  } else {
+    comenzar();
+  }
+});
+
+document.getElementById("pausa").addEventListener("click", pausarJuego);
+
+document.addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+    e.preventDefault();
+  }
+
+  if (e.key === "ArrowLeft") teclas.izquierda = true;
+  if (e.key === "ArrowRight") teclas.derecha = true;
+  if (e.key === " ") teclas.disparar = true;
+});
+
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") teclas.izquierda = false;
+  if (e.key === "ArrowRight") teclas.derecha = false;
+  if (e.key === " ") teclas.disparar = false;
+});
+
+window.addEventListener("blur", () => {
+  teclas.izquierda = false;
+  teclas.derecha = false;
+  teclas.disparar = false;
+});
+
+preparar();
+dibujar(0);
+</script>
+
+</body>
+</html>
